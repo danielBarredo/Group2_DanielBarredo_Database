@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text Highlighter with Direct Input</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+
+    /* Main container holding both buttons and sheet */
+    .main-container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Fixed sidebar for buttons */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      background-color: white;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      margin-right: 40px; /* Space between sidebar and sheet */
+      position: absolute; /* Change to absolute for free movement */
+      left: 20px; /* Initial left position */
+      top: 50%; /* Center vertically */
+      transform: translateY(-50%); /* Adjust for exact center */
+      cursor: move; /* Change cursor to indicate draggable */
+    }
+
+    button {
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      width: 150px;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    /* Centered text sheet */
+    .sheet {
+      width: 600px;
+      height: 750px;
+      background-color: white;
+      border: 1px solid #ccc;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      transition: all 0.3s ease-in-out;
+      margin: auto; /* Center horizontally */
+    }
+
+    .sheet.horizontal {
+      width: 800px;
+      height: 400px;
+    }
+
+    .highlighted {
+      background-color: yellow;
+      position: relative;
+    }
+
+    .covered {
+      text-decoration: line-through;
+      color: transparent;
+      position: relative;
+      display: inline-block;
+      pointer-events: none;
+    }
+
+    .covered::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 2px;
+      background-color: black;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .sheet[contenteditable="true"]:empty:before {
+      content: attr(data-placeholder);
+      color: #aaa;
+    }
+
+    p {
+      font-size: 16px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="main-container">
+    <!-- Sidebar for buttons -->
+    <div class="sidebar" draggable="true" id="sidebar">
+      <button onclick="highlightSelection()">Highlight Text</button>
+      <button onclick="removeHighlight()">Remove Highlight</button>
+      <button onclick="coverText()">Cover Text</button>
+      <button onclick="uncoverText()">Uncover Text</button>
+      <button onclick="undo()">Undo</button>
+      <button onclick="redo()">Redo</button>
+      <button onclick="toggleLayout()">Toggle Layout</button>
+    </div>
+
+    <!-- Centered text sheet -->
+    <div class="sheet" contenteditable="true" id="text-sheet" data-placeholder="Enter text here..." oninput="saveState()">
+      <!-- Users can directly type here -->
+    </div>
+  </div>
+
+  <script>
+    let undoStack = [];
+    let redoStack = [];
+
+    // Save the current state of the text
+    function saveState() {
+      const textSheet = document.getElementById('text-sheet');
+      undoStack.push(textSheet.innerHTML);
+      redoStack = []; // Clear redo stack on new input
+    }
+
+    // Function to highlight the selected text
+    function highlightSelection() {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+        span.classList.add('highlighted');
+        range.surroundContents(span);
+        selection.removeAllRanges();
+        saveState(); // Save state after modifying content
+      }
+    }
+
+    // Function to remove the highlight
+    function removeHighlight() {
+      const highlightedElements = document.querySelectorAll('.highlighted');
+
+      highlightedElements.forEach(span => {
+        const parent = span.parentNode;
+        parent.replaceChild(document.createTextNode(span.textContent), span);
+        parent.normalize();
+      });
+      saveState(); // Save state after modifying content
+    }
+
+    // Function to cover the highlighted text
+    function coverText() {
+      const highlightedElements = document.querySelectorAll('.highlighted');
+
+      if (highlightedElements.length === 0) {
+        alert("Please highlight a text first."); // Alert if no text is highlighted
+        return;
+      }
+
+      highlightedElements.forEach(span => {
+        span.classList.add('covered');  // Add 'covered' class to cover text
+      });
+      saveState(); // Save state after modifying content
+    }
+
+    // Function to uncover the highlighted text
+    function uncoverText() {
+      const coveredElements = document.querySelectorAll('.highlighted.covered');
+      coveredElements.forEach(span => {
+        span.classList.remove('covered');  // Remove 'covered' class to uncover text
+      });
+      saveState(); // Save state after modifying content
+    }
+
+    // Function to undo the last action
+    function undo() {
+      if (undoStack.length > 0) {
+        redoStack.push(undoStack.pop());
+        const lastState = undoStack[undoStack.length - 1];
+        document.getElementById('text-sheet').innerHTML = lastState || ''; // Restore to last state
+      }
+    }
+
+    // Function to redo the last undone action
+    function redo() {
+      if (redoStack.length > 0) {
+        const redoState = redoStack.pop();
+        undoStack.push(redoState);
+        document.getElementById('text-sheet').innerHTML = redoState; // Restore the redone state
+      }
+    }
+
+    // Toggle between vertical and horizontal layout
+    function toggleLayout() {
+      const sheet = document.getElementById('text-sheet');
+      sheet.classList.toggle('horizontal'); // Switch layout
+    }
+
+    // Keyboard shortcuts for undo and redo
+    document.addEventListener('keydown', function(event) {
+      if (event.ctrlKey && event.key === 'z') {
+        event.preventDefault();
+        undo();
+      } else if (event.ctrlKey && event.key === 'y') {
+        event.preventDefault();
+        redo();
+      }
+    });
+
+    // Drag and drop functionality for sidebar
+    const sidebar = document.getElementById('sidebar');
+
+    sidebar.addEventListener('dragstart', (e) => {
+      const offsetX = e.clientX - sidebar.getBoundingClientRect().left;
+      const offsetY = e.clientY - sidebar.getBoundingClientRect().top;
+      e.dataTransfer.setData('text/plain', `${offsetX},${offsetY}`);
+    });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault(); // Allow drop
+    });
+
+    document.addEventListener('drop', (e) => {
+      const data = e.dataTransfer.getData('text/plain').split(',');
+      const offsetX = parseInt(data[0]);
+      const offsetY = parseInt(data[1]);
+      sidebar.style.left = `${e.clientX - offsetX}px`;
+      sidebar.style.top = `${e.clientY - offsetY}px`;
+      sidebar.style.transform = 'none'; // Remove centering
+    });
+  </script>
+
+</body>
+</html>
